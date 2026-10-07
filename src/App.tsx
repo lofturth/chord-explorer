@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
-import { EXAMPLE_LIMIT, enumerateChords, names, noteName, structures } from './chords'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { enumerateChords, names, noteName, structures } from './chords'
 import type { Structure } from './chords'
+import { availableSelection, orderSummaryRows, summarizeStructures } from './summary'
+import { sampleChords } from './sampling'
 import './App.css'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
@@ -13,8 +15,41 @@ function App() {
   const derivedDistinct = pitchClasses.length || (structure !== 'any' ? 3 : 0)
   const effectiveDistinct = derivedDistinct || distinct || null
   const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
+  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
+  const [commonFirst, setCommonFirst] = useState(false)
+  const orderedSummary = useMemo(() => orderSummaryRows(summary, commonFirst), [summary, commonFirst])
+  const [selected, setSelected] = useState<string | null>(null)
+  const activeSelection = availableSelection(selected, summary)
+  if (selected !== activeSelection) setSelected(activeSelection)
+  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
+  const examples = useMemo(() => sampleChords(constraints, 100), [constraints])
+  const inspectionSection = useRef<HTMLElement | null>(null)
+  const selectedRow = useRef<HTMLTableRowElement | null>(null)
+  const examplesSection = useRef<HTMLElement | null>(null)
+  const [mainExamplesVisible, setMainExamplesVisible] = useState(false)
+  useEffect(() => {
+    const section = activeSelection ? inspectionSection.current : examplesSection.current
+    if (!section) {
+      setMainExamplesVisible(false)
+      return
+    }
+    const observer = new IntersectionObserver(([entry]) => setMainExamplesVisible(entry.isIntersecting))
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [examples, activeSelection])
+  const inspected = useMemo(() => activeSelection ? sampleChords(constraints, 20, activeSelection) : [], [constraints, activeSelection])
+
+  const previewChords = activeSelection ? inspected : examples
+  const selectedType = summary.find(row => row.intervals.join('–') === activeSelection)?.type
+  const previewLabel = activeSelection ? `${selectedType && selectedType !== '—' ? `${selectedType} · ` : ''}${activeSelection}` : 'Examples'
+  function navigateTo(element: HTMLElement | null) {
+    if (!element) return
+    element.focus({ preventScroll: true })
+    element.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })
+  }
   return (
     <main>
+      <div className="sticky-count" aria-live="polite">Remaining: {result.capped ? '>10,000' : result.count.toLocaleString('en-US')}</div>
       <h1>Chord-space explorer</h1>
       <p>Change constraints to narrow the space of possible chords.</p>
       <table className="constraints">
@@ -59,16 +94,38 @@ function App() {
       </table>
       <p className="definition">Each chord uses different pitches, ordered low to high. Octave doubling is allowed; repeating the same pitch is excluded. Range endpoints are included. Tuning: fixed 12-tone equal temperament.</p>
       <section aria-label="Results">
-        <h2 className="count" aria-live="polite">Remaining possibilities: {result.capped ? '>10,000' : result.count.toLocaleString('en-US')}</h2>
+
         {low > high ? <p role="alert">Choose a lowest pitch at or below the highest pitch.</p>
           : result.count === 0 ? <p>No chords match these constraints.</p>
           : <>
             {result.capped && <p>Counting stopped at the 10,001st match. Narrow the constraints to see an exact count.</p>}
-            <p>{result.count <= EXAMPLE_LIMIT ? `Showing all ${result.count} chords` : `Showing ${result.chords.length} examples`}</p>
-            <ul className="chords">{result.chords.map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>
+            <section aria-label="Structures in this space">
+              <h2>Structures in this space</h2>
+              <p>Counts of distinct pitch-class sets across the entire constrained space, independent of the concrete examples below.</p>
+              <p><small>Normalization uses the smallest enclosing span, then the lexicographically smallest interval sequence across reference pitches. Transpositions are grouped; inversions are not.</small></p>
+              <p><small>Click a row to inspect up to 20 varied voicings without changing the global constraints.</small></p>
+              <div className="summary-scroll"><table className="summary">
+                <thead><tr><th scope="col">Interval structure</th><th scope="col"><button type="button" aria-pressed={commonFirst} onClick={() => setCommonFirst(current => !current)} title="Toggle conventional types first">Conventional type<span aria-hidden="true"> {commonFirst ? '↑' : '↕'}</span></button></th><th scope="col">Pitch-class sets</th><th scope="col">Examples</th></tr></thead>
+                <tbody>{orderedSummary.map(row => <tr key={row.intervals.join(',')} ref={activeSelection === row.intervals.join('–') ? selectedRow : undefined} tabIndex={-1} className={activeSelection === row.intervals.join('–') ? 'selected' : ''} onClick={() => setSelected(row.intervals.join('–'))}><td><button type="button" aria-pressed={activeSelection === row.intervals.join('–')} onClick={() => setSelected(row.intervals.join('–'))}>{row.intervals.join('–')}</button></td><td>{row.type}</td><td>{row.pitchClassSets}</td><td>{row.examples.map(pcs => pcs.map(pc => names[pc]).join('–')).join(' · ')}</td></tr>)}</tbody>
+              </table></div>
+            </section>
+            {activeSelection && <section ref={inspectionSection} tabIndex={-1} className="inspection-section" aria-label="Inspected chord examples">
+              <h2>{inspected.length < 20 ? `All ${inspected.length} chords from ${activeSelection}` : `20 chord examples from ${activeSelection}`}</h2>
+              <button type="button" onClick={() => navigateTo(selectedRow.current)}>Back to structure ↑</button>
+              <ul className="chords">{inspected.map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>
+            </section>}
+            <section ref={examplesSection} aria-label="Concrete chord examples">
+            <h2>Concrete chord examples</h2>
+            <p>{result.count <= 100 ? `Showing all ${result.count} chords` : `Showing ${examples.length} examples`}</p>
+            <ul className="chords">{examples.map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>
+            </section>
           </>}
       </section>
       <footer>{__DEPLOY_ENV__} · {__GIT_COMMIT__} · v{__APP_VERSION__}</footer>
+      <aside className={`bottom-preview${mainExamplesVisible ? ' preview-hidden' : ''}`} aria-label="Chord preview" aria-hidden={mainExamplesVisible}>
+        <div className="preview-heading"><span>{previewLabel}</span>{activeSelection && <button type="button" onClick={() => navigateTo(inspectionSection.current)}>View {inspected.length} ↓</button>}</div>
+        {previewChords.length === 0 ? <p>No matching chords.</p> : <ul>{previewChords.slice(0, 5).map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>}
+      </aside>
     </main>
   )
 }
