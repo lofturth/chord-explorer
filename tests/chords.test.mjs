@@ -19,7 +19,7 @@ test('large enumeration stops at the 10,001st match', () => {
   const large = count({ voices: 7, low: 48, high: 63 })
   assert.equal(large.count, 10001)
   assert.equal(large.capped, true)
-  assert.deepEqual(large.chords, [])
+  assert.equal(large.chords.length, 100)
   const exact = count({ voices: 7, low: 48, high: 62 })
   assert.equal(exact.count, 6435)
   assert.equal(exact.capped, false)
@@ -42,7 +42,7 @@ test('pruned distinct-class counts agree with an independent exhaustive referenc
       const expected = reference.filter(notes => new Set(notes.map(n => n % 12)).size === distinct)
       const result = count({ voices, high: 62, distinct })
       assert.equal(result.count, expected.length)
-      if (expected.length <= 1000) assert.deepEqual(result.chords, expected)
+      assert.deepEqual(result.chords, expected.slice(0, 100))
     }
   }
 })
@@ -56,13 +56,64 @@ test('selected pitch classes require exactly the selected set, with octave doubl
   assert.deepEqual(count({ pitchClasses: [0, 4, 7], distinct: 3 }), result)
   assert.deepEqual(count({ pitchClasses: [] }), count())
 })
-test('display threshold includes 1,000 and excludes larger sets without capping the count', () => {
+test('examples remain limited to 100 while exact counting continues', () => {
   // Ten pitches from each selected class: 10 × 10 × 10 voicings.
   const exact = count({ low: 0, high: 119, pitchClasses: [0, 4, 7] })
   assert.equal(exact.count, 1000)
-  assert.equal(exact.chords.length, 1000)
+  assert.equal(exact.chords.length, 100)
   const larger = count({ low: 0, high: 120, pitchClasses: [0, 4, 7] })
   assert.equal(larger.count, 1100)
   assert.equal(larger.capped, false)
-  assert.deepEqual(larger.chords, [])
+  assert.equal(larger.chords.length, 100)
+})
+
+test('Major and Minor represent transposition-independent structures', async () => {
+  const { structures } = await import('../src/chords.ts')
+  assert.equal(structures.major, '0–4–7')
+  assert.equal(structures.minor, '0–3–7')
+  for (const structure of ['major', 'minor']) {
+    for (let root = 0; root < 12; root++) {
+      const pitchClasses = [0, structure === 'major' ? 4 : 3, 7].map(n => (root + n) % 12)
+      const result = count({ low: 48, high: 71, structure, pitchClasses })
+      assert.equal(result.count, 8)
+      assert.ok(result.chords.every(notes => {
+        const pcs = [...new Set(notes.map(n => n % 12))].sort((a, b) => a - b)
+        return pcs.join() === [...pitchClasses].sort((a, b) => a - b).join()
+      }))
+    }
+    assert.equal(count({ low: 48, high: 71, structure }).count, 96)
+  }
+})
+test('structures combine with exact pitches, doubling, voices and distinct count', () => {
+  assert.equal(count({ structure: 'major', pitchClasses: [0, 4, 7] }).count, 2)
+  assert.equal(count({ structure: 'minor', pitchClasses: [0, 4, 7] }).count, 0)
+  assert.equal(count({ structure: 'minor', pitchClasses: [0, 3, 7] }).count, 2)
+  assert.equal(count({ structure: 'major', pitchClasses: [0, 4] }).count, 0)
+  assert.equal(count({ structure: 'major', distinct: 2 }).count, 0)
+  assert.equal(count({ structure: 'major', voices: 2 }).count, 0)
+  assert.deepEqual(count({ structure: 'major', pitchClasses: [0, 4, 7], voices: 4 }).chords, [[48, 52, 55, 60]])
+  assert.deepEqual(count({ structure: 'any' }), count())
+  assert.equal(count({ structure: 'major', high: 50 }).count, 0)
+})
+test('structured enumeration retains the counting cutoff', () => {
+  const result = count({ structure: 'major', low: 0, high: 127, voices: 4 })
+  assert.equal(result.count, 10001)
+  assert.equal(result.capped, true)
+  assert.equal(result.chords.length, 100)
+  assert.ok(result.chords.every(notes => {
+    const pcs = new Set(notes.map(n => n % 12))
+    return notes.length === 4 && notes.every(n => n >= 0 && n <= 127) && pcs.size === 3 &&
+      [...pcs].some(root => [0, 4, 7].every(interval => pcs.has((root + interval) % 12)))
+  }))
+})
+
+test('example counts handle zero, small, exactly 100 and larger sets', () => {
+  assert.equal(count({ voices: 2, high: 48 }).chords.length, 0)
+  assert.equal(count({ voices: 1, high: 54 }).chords.length, 7)
+  const hundred = count({ voices: 3, low: 0, high: 119, pitchClasses: [0, 1] })
+  assert.equal(hundred.count, 900)
+  assert.equal(hundred.chords.length, 100)
+  const exactly = count({ voices: 2, low: 0, high: 119, pitchClasses: [0, 1] })
+  assert.equal(exactly.count, 100)
+  assert.equal(exactly.chords.length, 100)
 })
