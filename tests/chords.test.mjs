@@ -68,7 +68,7 @@ test('examples remain limited to 100 while exact counting continues', () => {
   assert.equal(larger.chords.length, 100)
 })
 
-test('Major and Minor represent transposition-independent structures', async () => {
+test('Major triad and Minor triad represent transposition-independent structures', async () => {
   const { structures } = await import('../src/chords.ts')
   assert.equal(structures.major, '0–4–7')
   assert.equal(structures.minor, '0–3–7')

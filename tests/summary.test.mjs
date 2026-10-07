@@ -5,7 +5,7 @@ import { enumerateChords } from '../src/chords.ts'
 const base = { voices: 3, low: 48, high: 71, distinct: null }
 const total = rows => rows.reduce((sum, row) => sum + row.pitchClassSets, 0)
 test('all transposed major and minor sets preserve their recognized representations', () => {
-  for (const [structure, intervals, type] of [['major', [0,4,7], 'Major'], ['minor', [0,3,7], 'Minor']]) {
+  for (const [structure, intervals, type] of [['major', [0,4,7], 'Major triad'], ['minor', [0,3,7], 'Minor triad']]) {
     for (let root = 0; root < 12; root++) assert.deepEqual(normalizePitchClasses(intervals.map(i => (root + i) % 12)), intervals)
     const rows = summarizeStructures({ ...base, structure })
     assert.equal(rows.length, 1)

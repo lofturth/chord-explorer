@@ -11,7 +11,7 @@ test('common-first presentation keeps every row and normal ordering within group
   assert.equal(normal[0].intervals.join('–'),'0')
   assert.equal(orderSummaryRows(normal,false),normal)
   const common=orderSummaryRows(normal,true)
-  assert.deepEqual(common.slice(0,2).map(row=>row.type),['Minor','Major'])
+  assert.deepEqual(common.slice(0,2).map(row=>row.type),['Minor triad','Major triad'])
   assert.deepEqual(common.filter(row=>row.type==='—'),normal.filter(row=>row.type==='—'))
   assert.deepEqual(new Set(common),new Set(normal))
   assert.deepEqual(normal,original)
