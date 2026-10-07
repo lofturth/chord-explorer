@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { enumerateChords, names, noteName, structures } from './chords'
 import type { Structure } from './chords'
 import { availableSelection, orderSummaryRows, summarizeStructures } from './summary'
@@ -6,6 +6,8 @@ import { sampleChords } from './sampling'
 import './App.css'
 import { MidiTest } from './MidiTest'
 import { useMidi } from './useMidi'
+import { AUTOPLAY_INTERVALS, DEFAULT_AUTOPLAY_INTERVAL, createAutoplay } from './autoplay'
+import type { AutoplayInterval } from './autoplay'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
   const midi = useMidi()
@@ -27,6 +29,36 @@ function App() {
   if (selected !== activeSelection) setSelected(activeSelection)
   const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
   const examples = useMemo(() => sampleChords(constraints, 100), [constraints])
+  const [autoplayEnabled, setAutoplayEnabled] = useState(false)
+  const [autoplayInterval, setAutoplayInterval] = useState<AutoplayInterval>(DEFAULT_AUTOPLAY_INTERVAL)
+  const autoplayLoop = useRef<ReturnType<typeof createAutoplay> | null>(null)
+  const autoplayState = useRef({ constraints, play: midi.play, stop: midi.stop })
+  useLayoutEffect(() => { autoplayState.current = { constraints, play: midi.play, stop: midi.stop } })
+  useEffect(() => {
+    if (!autoplayEnabled) return
+    const autoplay = createAutoplay(
+      () => sampleChords(autoplayState.current.constraints, 1),
+      chord => { void autoplayState.current.play(chord) },
+      () => autoplayState.current.stop(),
+    )
+    autoplay.start()
+    autoplayLoop.current = autoplay
+    return () => { autoplay.stop(); autoplayLoop.current = null }
+  }, [autoplayEnabled])
+  useEffect(() => { autoplayLoop.current?.start(autoplayInterval) }, [autoplayInterval, autoplayEnabled])
+  useEffect(() => {
+    function shortcut(event: KeyboardEvent) {
+      const target = event.target
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+      if (target instanceof HTMLElement && (target.closest('input, select, textarea') || target.isContentEditable)) return
+      if (event.key.toLowerCase() === 'a') {
+        event.preventDefault()
+        setAutoplayEnabled(current => !current)
+      }
+    }
+    window.addEventListener('keydown', shortcut)
+    return () => window.removeEventListener('keydown', shortcut)
+  }, [])
   const inspectionSection = useRef<HTMLElement | null>(null)
   const selectedRow = useRef<HTMLTableRowElement | null>(null)
   const examplesSection = useRef<HTMLElement | null>(null)
@@ -53,7 +85,10 @@ function App() {
   }
   return (
     <main>
-      <div className="sticky-count" aria-live="polite">Remaining: {result.capped ? '>10,000' : result.count.toLocaleString('en-US')}</div>
+      <div className="sticky-count">
+        <div className="autoplay-control"><button type="button" aria-pressed={autoplayEnabled} aria-keyshortcuts="a" onClick={() => setAutoplayEnabled(current => !current)}>Random autoplay: {autoplayEnabled ? 'Playing' : 'Stopped'} <kbd>A</kbd></button><label>Interval <select value={autoplayInterval} onChange={event => setAutoplayInterval(Number(event.target.value) as AutoplayInterval)}>{AUTOPLAY_INTERVALS.map(interval => <option key={interval} value={interval}>{interval / 1000} s</option>)}</select></label>{autoplayEnabled && examples.length === 0 && <small role="status">No matching chords.</small>}</div>
+        <span aria-live="polite">Remaining: {result.capped ? '>10,000' : result.count.toLocaleString('en-US')}</span>
+      </div>
       <h1>Chord-space explorer</h1>
       <p>Change constraints to narrow the space of possible chords.</p>
       <MidiTest midi={midi} />

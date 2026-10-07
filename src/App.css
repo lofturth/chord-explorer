@@ -104,3 +104,11 @@ select { border-radius: 6px; background: #ffffff; box-shadow: 0 1px 2px #25364d0
 .bottom-preview .play-chord { padding: 4px 8px; }
 .play-chord:hover { background: #e1ecfb; color: #265da5; }
 .play-chord:active { background: #cad6e6; }
+.sticky-count { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.sticky-count > span { margin-left: auto; }
+.autoplay-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; text-align: left; }
+.autoplay-control button { font-family: inherit; font-size: .8rem; font-weight: 500; line-height: 1.4; color: #265da5; background: white; border: 1px solid #b4c9e4; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.autoplay-control button[aria-pressed="true"] { background: #e1ecfb; border-color: #326ac0; }
+.autoplay-control kbd { font: inherit; margin-left: 6px; color: #64748b; border-left: 1px solid #cad6e6; padding-left: 6px; }
+.autoplay-control label { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 500; }
+.autoplay-control select { font: inherit; min-height: 32px; padding: 4px 8px; }

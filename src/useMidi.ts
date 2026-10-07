@@ -52,5 +52,5 @@ export function useMidi() {
       setStatus(`MIDI send failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  return { access, outputs, selected, setSelected, requesting, status, supported, requestAccess, play }
+  return { access, outputs, selected, setSelected, requesting, status, supported, requestAccess, play, stop }
 }
