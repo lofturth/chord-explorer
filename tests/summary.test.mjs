@@ -20,20 +20,20 @@ test('normalization is deterministic for ambiguous references and symmetric sets
   for (let shift = 0; shift < 12; shift++) assert.deepEqual(normalizePitchClasses([7,6,1,0].map(pc => (pc + shift) % 12)), expected)
 })
 test('octave placement and doubling collapse to one pitch-class set', () => {
-  const constraints = { ...base, voices: 4, pitchClasses: [0,4,7] }
+  const constraints = { ...base, voices: 4, distinct: 3, pitchClasses: [0,4,7] }
   assert.ok(enumerateChords(constraints).count > 1)
   const rows = summarizeStructures(constraints)
   assert.equal(total(rows), 1)
   assert.deepEqual(rows[0].examples, [[0,4,7]])
 })
-test('range, voices, exact selection, distinct count and structure affect feasibility', () => {
+test('range, voices, required selection, distinct count and structure affect feasibility', () => {
   assert.equal(total(summarizeStructures({ ...base, distinct: 3 })), 220)
   assert.equal(total(summarizeStructures({ ...base, high: 50, distinct: 3 })), 1)
   assert.equal(total(summarizeStructures({ ...base, high: 50, voices: 4 })), 0)
   assert.equal(total(summarizeStructures({ ...base, voices: 2, structure: 'major' })), 0)
   assert.equal(total(summarizeStructures({ ...base, structure: 'minor', pitchClasses: [0,4,7] })), 0)
   assert.equal(total(summarizeStructures({ ...base, distinct: 2, pitchClasses: [0,4,7] })), 0)
-  assert.equal(total(summarizeStructures({ ...base, voices: 4, high: 59, pitchClasses: [0,4,7] })), 0)
+  assert.equal(total(summarizeStructures({ ...base, voices: 4, high: 59, distinct: 3, pitchClasses: [0,4,7] })), 0)
 })
 test('summary examples satisfy constraints and the reported structure', () => {
   for (const constraints of [base, { ...base, voices: 4, high: 62 }, { ...base, structure: 'minor' }, { ...base, pitchClasses: [0,4,7] }]) {
@@ -62,7 +62,7 @@ test('summary matches exhaustive concrete sets in a small space', () => {
   const reference = new Map()
   for (let mask = 1; mask < 4096; mask++) {
     const pcs = Array.from({length:12},(_,pc)=>pc).filter(pc=>mask & (1 << pc))
-    if (!enumerateChords({...constraints,pitchClasses:pcs}).count) continue
+    if (!enumerateChords({...constraints,pitchClasses:pcs,distinct:pcs.length}).count) continue
     const key = normalizePitchClasses(pcs).join()
     reference.set(key, (reference.get(key) ?? 0) + 1)
   }

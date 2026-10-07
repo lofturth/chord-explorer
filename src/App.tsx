@@ -8,6 +8,7 @@ import { MidiTest } from './MidiTest'
 import { useMidi } from './useMidi'
 import { AUTOPLAY_INTERVALS, DEFAULT_AUTOPLAY_INTERVAL, createAutoplay } from './autoplay'
 import type { AutoplayInterval } from './autoplay'
+import { pitchClassDisabled, reconcilePitchSelection } from './pitchSelection'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
   const midi = useMidi()
@@ -17,8 +18,14 @@ function App() {
   const [distinct, setDistinct] = useState(0)
   const [pitchClasses, setPitchClasses] = useState<number[]>([])
   const [structure, setStructure] = useState<Structure>('any')
-  const derivedDistinct = pitchClasses.length || (structure !== 'any' ? 3 : 0)
+  const derivedDistinct = structure !== 'any' ? Math.min(voices, Math.max(3, pitchClasses.length)) : 0
   const effectiveDistinct = derivedDistinct || distinct || null
+  function updatePitchSelection(nextVoices: number, required: number[]) {
+    const next = reconcilePitchSelection(nextVoices, required, distinct)
+    setVoices(nextVoices)
+    setPitchClasses(next.pitchClasses)
+    setDistinct(next.distinct)
+  }
   const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
   const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
   const [structuresOpen, setStructuresOpen] = useState(false)
@@ -96,7 +103,7 @@ function App() {
         <caption>Constraints</caption>
         <tbody>
           <tr><th scope="row"><label htmlFor="voices">Number of voices</label></th><td>
-            <select id="voices" value={voices} onChange={e => setVoices(Number(e.target.value))}>
+            <select id="voices" value={voices} onChange={e => updatePitchSelection(Number(e.target.value), pitchClasses)}>
               {Array.from({ length: 8 }, (_, i) => i + 1).map(n => <option key={n}>{n}</option>)}
             </select>
           </td></tr>
@@ -114,9 +121,9 @@ function App() {
           </td></tr>
           <tr><th scope="row">Pitch classes</th><td>
             <div className="pitch-classes" role="group" aria-label="Pitch classes">
-              {names.map((name, pc) => <label key={pc}><input type="checkbox" checked={pitchClasses.includes(pc)} onChange={e => setPitchClasses(current => e.target.checked ? [...current, pc] : current.filter(value => value !== pc))} />{name}</label>)}
+              {names.map((name, pc) => <label key={pc}><input type="checkbox" checked={pitchClasses.includes(pc)} disabled={pitchClassDisabled(pc, pitchClasses, voices)} onChange={e => updatePitchSelection(voices, e.target.checked ? [...pitchClasses, pc] : pitchClasses.filter(value => value !== pc))} />{name}</label>)}
             </div>
-            <small>Select the exact set of pitch classes. None selected means any set.</small>
+            <small>Require these pitch classes. None selected means no pitch-class requirement.</small>
           </td></tr>
           <tr><th scope="row">Pitch range</th><td className="range">
             <label>Lowest pitch <select value={low} onChange={e => setLow(Number(e.target.value))}>{pitches.map(n => <option key={n} value={n}>{noteName(n)}</option>)}</select></label>
@@ -126,9 +133,9 @@ function App() {
           <tr><th scope="row"><label htmlFor="distinct">Number of distinct pitch classes</label></th><td>
             <select id="distinct" value={derivedDistinct || distinct} disabled={derivedDistinct > 0} aria-describedby={derivedDistinct ? 'derived-distinct' : undefined} onChange={e => setDistinct(Number(e.target.value))}>
               <option value={0}>Any</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n}>{n}</option>)}
+              {Array.from({ length: voices }, (_, i) => i + 1).map(n => <option key={n} disabled={n < pitchClasses.length}>{n}</option>)}
             </select>
-            {derivedDistinct > 0 && <p id="derived-distinct"><small>{pitchClasses.length ? 'Determined by the selected pitch classes.' : 'Determined by the interval structure (3 distinct pitch classes).'}{pitchClasses.length > 0 && structure !== 'any' && ' The interval structure also requires 3 distinct pitch classes; incompatible selections give zero possibilities.'}</small></p>}
+            {derivedDistinct > 0 && <p id="derived-distinct"><small>The interval structure requires 3 distinct pitch classes. Incompatible voice counts or required pitch classes give zero possibilities.</small></p>}
           </td></tr>
         </tbody>
       </table>

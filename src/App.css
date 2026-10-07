@@ -16,6 +16,8 @@ th { width: 38%; padding-right: 24px; font-weight: 500; }
 .pitch-classes label:hover { background: #eaf0f8; }
 .pitch-classes label:has(input:checked) { background: #e1ecfb; }
 .pitch-classes input { margin: 0; accent-color: #326ac0; }
+.pitch-classes label:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.pitch-classes label:has(input:disabled):hover { background: #f6f8fc; }
 .definition { font-size: .85rem; color: #64748b; margin-top: 18px; }
 section { margin-top: 40px; }
 .chords { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 24px; list-style: none; padding: 0; }

@@ -35,7 +35,7 @@ export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClass
   const selectedMask = pitchClasses.reduce((mask, pc) => mask | (1 << pc), 0)
   const sets: number[][] = []
   for (let mask = 1; mask < 4096; mask++) {
-    if (selectedMask && mask !== selectedMask) continue
+    if ((mask & selectedMask) !== selectedMask) continue
     const pcs = Array.from({ length: 12 }, (_, pc) => pc).filter(pc => mask & (1 << pc))
     if (pcs.length > voices || (distinct !== null && pcs.length !== distinct) || pcs.some(pc => capacity[pc] === 0) || pcs.reduce((sum, pc) => sum + capacity[pc], 0) < voices) continue
     const intervals = normalizePitchClasses(pcs)
