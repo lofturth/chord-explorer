@@ -16,6 +16,14 @@ npm install
 npm run dev
 ```
 
+Use `npm run dev` while actively developing; Vite watches source files and updates
+the browser with HMR.
+
+Use `npm run play` to play/explore while source files are being edited. It builds
+a separate snapshot in `.play-dist` and serves it at `http://127.0.0.1:4173`
+without watching, rebuilding, or HMR. Stop and restart `npm run play` to refresh
+the snapshot. Normal builds in `dist` do not replace this playing snapshot.
+
 ### Validation
 
 ```bash

@@ -29,19 +29,35 @@ export function concreteMidiNotes(chord: readonly number[]): number[] {
   return [...chord]
 }
 
-export const PERFORMANCE_RANGE = { maxOnsetMs: 50, velocityMean: 38, velocityStandardDeviation: 15 } as const
+export const PERFORMANCE_RANGE = { timingMeanMs: 0, timingStandardDeviationMs: 25, velocityMean: 38, velocityStandardDeviation: 15 } as const
+
+function sampleGaussian(random: () => number): number {
+  // 1 - random() is in (0, 1], keeping log() finite even for a zero draw.
+  return Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random())
+}
+
+export function sampleTimingOffset(random: () => number = Math.random): number {
+  return PERFORMANCE_RANGE.timingMeanMs + PERFORMANCE_RANGE.timingStandardDeviationMs * sampleGaussian(random)
+}
+
+export function normalizeOnsets(offsets: readonly number[]): number[] {
+  if (!offsets.length) return []
+  const earliest = Math.min(...offsets)
+  return offsets.map(offset => offset - earliest)
+}
 
 export function sampleVelocity(random: () => number = Math.random): number {
-  // 1 - random() is in (0, 1], keeping log() finite even for a zero draw.
-  const gaussian = Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random())
+  const gaussian = sampleGaussian(random)
   const velocity = Math.round(PERFORMANCE_RANGE.velocityMean + PERFORMANCE_RANGE.velocityStandardDeviation * gaussian)
   return Math.max(1, Math.min(127, velocity))
 }
 
 export function randomPerformance(chord: readonly number[], random: () => number = Math.random) {
-  return concreteMidiNotes(chord).map(note => ({
+  const notes = concreteMidiNotes(chord)
+  const onsets = normalizeOnsets(notes.map(() => sampleTimingOffset(random)))
+  return notes.map((note, index) => ({
     note,
-    onsetMs: random() * PERFORMANCE_RANGE.maxOnsetMs,
+    onsetMs: onsets[index],
     velocity: sampleVelocity(random),
   }))
 }

@@ -53,19 +53,43 @@ test('Gaussian velocities round around 38 and clamp both tails to MIDI bounds', 
 test('performance keeps exact pitches and independently draws valid timing and velocity', async () => {
   const { randomPerformance, concreteMidiNotes } = await import('../src/midi.ts')
   const { noteName } = await import('../src/chords.ts')
-  const draws=[0,0,0, 0.999999,1-Math.exp(-0.5),0, 0.2,1-Math.exp(-0.5),0.5, 0.8,0,0]
+  const draws=[1-Math.exp(-0.5),0.5, 0,0, 1-Math.exp(-0.5),0, 1-Math.exp(-8),0, 0,0, 1-Math.exp(-0.5),0, 1-Math.exp(-0.5),0.5, 0,0]
   const chord=[48,55,64,83]
   const events=randomPerformance(chord,()=>draws.shift())
   assert.deepEqual(events.map(event=>event.note),chord)
   assert.deepEqual(chord,[48,55,64,83])
   assert.deepEqual(events.map(event=>event.velocity),[38,53,23,38])
-  assert.deepEqual(events.map(event=>event.onsetMs),[0,0.999999*50,10,40])
+  const expected=[0,25,50,125]
+  events.forEach((event,index)=>assert.ok(Math.abs(event.onsetMs-expected[index])<1e-8))
+  assert.equal(Math.min(...events.map(event=>event.onsetMs)),0)
   for(const event of events) {
-    assert.ok(event.onsetMs>=0 && event.onsetMs<=50)
+    assert.ok(event.onsetMs>=0)
     assert.ok(Number.isInteger(event.velocity) && event.velocity>=1 && event.velocity<=127)
   }
   assert.equal([48,52,67].map(noteName).join(' – '),'C3 – E3 – G4')
   assert.throws(()=>concreteMidiNotes([128]), /Invalid/)
+})
+
+test('signed Gaussian timing has zero center and permits unclamped rare large offsets', async () => {
+  const { sampleTimingOffset, normalizeOnsets } = await import('../src/midi.ts')
+  const sample = (radius, angle) => {
+    const draws=[1-Math.exp(-radius*radius/2),angle]
+    return sampleTimingOffset(()=>draws.shift())
+  }
+  assert.equal(sample(0,0),0)
+  for (const [radius,angle,expected] of [[1,0,25],[1,0.5,-25],[5,0,125],[5,0.5,-125]]) {
+    assert.ok(Math.abs(sample(radius,angle)-expected)<1e-6)
+  }
+  const offsets=[-70,15,90]
+  const onsets=normalizeOnsets(offsets)
+  assert.deepEqual(onsets,[0,85,160])
+  assert.deepEqual(offsets,[-70,15,90])
+  for(let i=0;i<offsets.length;i++) for(let j=0;j<offsets.length;j++) {
+    assert.equal(onsets[i]-onsets[j],offsets[i]-offsets[j])
+  }
+  assert.deepEqual(normalizeOnsets([70,15,90]),[55,0,75])
+  assert.deepEqual(normalizeOnsets([50]),[0])
+  assert.deepEqual(normalizeOnsets([]),[])
 })
 
 test('playback preserves octaves and releases every note 1.5 seconds after attack', async () => {
