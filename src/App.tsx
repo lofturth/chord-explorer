@@ -16,6 +16,7 @@ function App() {
   const effectiveDistinct = derivedDistinct || distinct || null
   const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
   const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
+  const [structuresOpen, setStructuresOpen] = useState(false)
   const [commonFirst, setCommonFirst] = useState(false)
   const orderedSummary = useMemo(() => orderSummaryRows(summary, commonFirst), [summary, commonFirst])
   const [selected, setSelected] = useState<string | null>(null)
@@ -95,12 +96,9 @@ function App() {
       <p className="definition">Each chord uses different pitches, ordered low to high. Octave doubling is allowed; repeating the same pitch is excluded. Range endpoints are included. Tuning: fixed 12-tone equal temperament.</p>
       <section aria-label="Results">
 
-        {low > high ? <p role="alert">Choose a lowest pitch at or below the highest pitch.</p>
-          : result.count === 0 ? <p>No chords match these constraints.</p>
-          : <>
-            {result.capped && <p>Counting stopped at the 10,001st match. Narrow the constraints to see an exact count.</p>}
             <section aria-label="Structures in this space">
-              <h2>Structures in this space</h2>
+              <h2 className="structure-heading"><button type="button" aria-expanded={structuresOpen} aria-controls="structure-table-content" onClick={() => setStructuresOpen(open => !open)}>Structures in this space <span className="structure-count">{summary.length} {summary.length === 1 ? 'structure' : 'structures'}</span><span aria-hidden="true">{structuresOpen ? '−' : '+'}</span></button></h2>
+              <div id="structure-table-content" hidden={!structuresOpen}>
               <p>Counts of distinct pitch-class sets across the entire constrained space, independent of the concrete examples below.</p>
               <p><small>Normalization uses the smallest enclosing span, then the lexicographically smallest interval sequence across reference pitches. Transpositions are grouped; inversions are not.</small></p>
               <p><small>Click a row to inspect up to 20 varied voicings without changing the global constraints.</small></p>
@@ -108,10 +106,15 @@ function App() {
                 <thead><tr><th scope="col">Interval structure</th><th scope="col"><button type="button" aria-pressed={commonFirst} onClick={() => setCommonFirst(current => !current)} title="Toggle conventional types first">Conventional type<span aria-hidden="true"> {commonFirst ? '↑' : '↕'}</span></button></th><th scope="col">Pitch-class sets</th><th scope="col">Examples</th></tr></thead>
                 <tbody>{orderedSummary.map(row => <tr key={row.intervals.join(',')} ref={activeSelection === row.intervals.join('–') ? selectedRow : undefined} tabIndex={-1} className={activeSelection === row.intervals.join('–') ? 'selected' : ''} onClick={() => setSelected(row.intervals.join('–'))}><td><button type="button" aria-pressed={activeSelection === row.intervals.join('–')} onClick={() => setSelected(row.intervals.join('–'))}>{row.intervals.join('–')}</button></td><td>{row.type}</td><td>{row.pitchClassSets}</td><td>{row.examples.map(pcs => pcs.map(pc => names[pc]).join('–')).join(' · ')}</td></tr>)}</tbody>
               </table></div>
+              </div>
             </section>
+        {low > high ? <p role="alert">Choose a lowest pitch at or below the highest pitch.</p>
+          : result.count === 0 ? <p>No chords match these constraints.</p>
+          : <>
+            {result.capped && <p>Counting stopped at the 10,001st match. Narrow the constraints to see an exact count.</p>}
             {activeSelection && <section ref={inspectionSection} tabIndex={-1} className="inspection-section" aria-label="Inspected chord examples">
               <h2>{inspected.length < 20 ? `All ${inspected.length} chords from ${activeSelection}` : `20 chord examples from ${activeSelection}`}</h2>
-              <button type="button" onClick={() => navigateTo(selectedRow.current)}>Back to structure ↑</button>
+              <button type="button" onClick={() => { setStructuresOpen(true); requestAnimationFrame(() => navigateTo(selectedRow.current)) }}>Back to structure ↑</button>
               <ul className="chords">{inspected.map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>
             </section>}
             <section ref={examplesSection} aria-label="Concrete chord examples">
