@@ -99,3 +99,8 @@ select { border-radius: 6px; background: #ffffff; box-shadow: 0 1px 2px #25364d0
 .midi-test button { font: inherit; padding: 6px 10px; border: 1px solid #b4c9e4; border-radius: 6px; background: #f8faff; color: #265da5; cursor: pointer; margin-right: 12px; }
 .midi-test button:disabled { opacity: .55; cursor: default; }
 .midi-test label { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 12px 8px 0; }
+.chords li:has(.play-chord), .bottom-preview li:has(.play-chord) { padding: 0; }
+.play-chord { display: block; width: 100%; font: inherit; color: inherit; background: transparent; border: 0; border-radius: inherit; padding: 10px 12px; text-align: left; cursor: pointer; }
+.bottom-preview .play-chord { padding: 4px 8px; }
+.play-chord:hover { background: #e1ecfb; color: #265da5; }
+.play-chord:active { background: #cad6e6; }

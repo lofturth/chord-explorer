@@ -21,3 +21,75 @@ export function sendTestChord(output: MidiSender, now: number = performance.now(
     throw error
   }
 }
+
+// Concrete chords already contain MIDI integers: no note-name parsing or octave
+// conversion belongs in playback. Copy only to keep the caller's chord immutable.
+export function concreteMidiNotes(chord: readonly number[]): number[] {
+  if (chord.some(note => !Number.isInteger(note) || note < 0 || note > 127)) throw new Error('Invalid concrete MIDI pitch.')
+  return [...chord]
+}
+
+export const PERFORMANCE_RANGE = { maxOnsetMs: 50, velocityMean: 38, velocityStandardDeviation: 15 } as const
+
+export function sampleVelocity(random: () => number = Math.random): number {
+  // 1 - random() is in (0, 1], keeping log() finite even for a zero draw.
+  const gaussian = Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random())
+  const velocity = Math.round(PERFORMANCE_RANGE.velocityMean + PERFORMANCE_RANGE.velocityStandardDeviation * gaussian)
+  return Math.max(1, Math.min(127, velocity))
+}
+
+export function randomPerformance(chord: readonly number[], random: () => number = Math.random) {
+  return concreteMidiNotes(chord).map(note => ({
+    note,
+    onsetMs: random() * PERFORMANCE_RANGE.maxOnsetMs,
+    velocity: sampleVelocity(random),
+  }))
+}
+
+export interface PlaybackOutput extends MidiSender { clear?(): void }
+export function createChordPlayer(
+  schedule: (callback: () => void, delay: number) => ReturnType<typeof setTimeout> = setTimeout,
+  cancel: (timer: ReturnType<typeof setTimeout>) => void = clearTimeout,
+  random: () => number = Math.random,
+) {
+  let active: { output: PlaybackOutput; notes: number[] } | null = null
+  let timers: ReturnType<typeof setTimeout>[] = []
+  function stop() {
+    const previous = active
+    active = null
+    for (const timer of timers) cancel(timer)
+    timers = []
+    if (!previous) return
+    let failure: unknown
+    try { previous.output.clear?.() } catch (error) { failure = error }
+    for (const note of previous.notes) {
+      try { previous.output.send([0x80, note, 0]) } catch (error) { failure = error }
+    }
+    if (failure) throw failure
+  }
+  function play(output: PlaybackOutput, chord: readonly number[], _now: number = performance.now()) {
+    const performance = randomPerformance(chord, random)
+    stop()
+    const audition = { output, notes: [] as number[] }
+    active = audition
+    for (const event of performance) {
+      // Keep delayed attacks out of the device queue: even ports without clear()
+      // can cancel them. Identity checks also reject already-dispatched callbacks.
+      timers.push(schedule(() => {
+        if (active !== audition) return
+        audition.notes.push(event.note)
+        try {
+          output.send([0x90, event.note, event.velocity])
+          timers.push(schedule(() => {
+            if (active !== audition) return
+            try { output.send([0x80, event.note, 0]) } catch { /* Disconnected port. */ }
+            audition.notes = audition.notes.filter(note => note !== event.note)
+          }, TEST_DURATION))
+        } catch {
+          try { stop() } catch { /* Disconnected port. */ }
+        }
+      }, event.onsetMs))
+    }
+  }
+  return { play, stop }
+}

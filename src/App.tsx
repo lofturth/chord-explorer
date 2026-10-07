@@ -5,8 +5,10 @@ import { availableSelection, orderSummaryRows, summarizeStructures } from './sum
 import { sampleChords } from './sampling'
 import './App.css'
 import { MidiTest } from './MidiTest'
+import { useMidi } from './useMidi'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
+  const midi = useMidi()
   const [voices, setVoices] = useState(4)
   const [low, setLow] = useState(48)
   const [high, setHigh] = useState(84)
@@ -54,7 +56,7 @@ function App() {
       <div className="sticky-count" aria-live="polite">Remaining: {result.capped ? '>10,000' : result.count.toLocaleString('en-US')}</div>
       <h1>Chord-space explorer</h1>
       <p>Change constraints to narrow the space of possible chords.</p>
-      <MidiTest />
+      <MidiTest midi={midi} />
       <table className="constraints">
         <caption>Constraints</caption>
         <tbody>
@@ -117,19 +119,19 @@ function App() {
             {activeSelection && <section ref={inspectionSection} tabIndex={-1} className="inspection-section" aria-label="Inspected chord examples">
               <h2>{inspected.length < 20 ? `All ${inspected.length} chords from ${activeSelection}` : `20 chord examples from ${activeSelection}`}</h2>
               <button type="button" onClick={() => { setStructuresOpen(true); requestAnimationFrame(() => navigateTo(selectedRow.current)) }}>Back to structure ↑</button>
-              <ul className="chords">{inspected.map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>
+              <ul className="chords">{inspected.map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => midi.play(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>
             </section>}
             <section ref={examplesSection} aria-label="Concrete chord examples">
             <h2>Concrete chord examples</h2>
             <p>{result.count <= 100 ? `Showing all ${result.count} chords` : `Showing ${examples.length} examples`}</p>
-            <ul className="chords">{examples.map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>
+            <ul className="chords">{examples.map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => midi.play(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>
             </section>
           </>}
       </section>
       <footer>{__DEPLOY_ENV__} · {__GIT_COMMIT__} · v{__APP_VERSION__}</footer>
       <aside className={`bottom-preview${mainExamplesVisible ? ' preview-hidden' : ''}`} aria-label="Chord preview" aria-hidden={mainExamplesVisible}>
         <div className="preview-heading"><span>{previewLabel}</span>{activeSelection && <button type="button" onClick={() => navigateTo(inspectionSection.current)}>View {inspected.length} ↓</button>}</div>
-        {previewChords.length === 0 ? <p>No matching chords.</p> : <ul>{previewChords.slice(0, 5).map(chord => <li key={chord.join(',')}>{chord.map(noteName).join(' – ')}</li>)}</ul>}
+        {previewChords.length === 0 ? <p>No matching chords.</p> : <ul>{previewChords.slice(0, 5).map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => midi.play(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>}
       </aside>
     </main>
   )
