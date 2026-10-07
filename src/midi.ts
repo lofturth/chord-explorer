@@ -29,7 +29,7 @@ export function concreteMidiNotes(chord: readonly number[]): number[] {
   return [...chord]
 }
 
-export const PERFORMANCE_RANGE = { timingMeanMs: 0, timingStandardDeviationMs: 25, velocityMean: 38, velocityStandardDeviation: 15 } as const
+export const PERFORMANCE_RANGE = { timingMeanMs: 0, timingStandardDeviationMs: 15, velocityMean: 38, velocityStandardDeviation: 15 } as const
 
 function sampleGaussian(random: () => number): number {
   // 1 - random() is in (0, 1], keeping log() finite even for a zero draw.

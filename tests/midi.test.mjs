@@ -59,7 +59,7 @@ test('performance keeps exact pitches and independently draws valid timing and v
   assert.deepEqual(events.map(event=>event.note),chord)
   assert.deepEqual(chord,[48,55,64,83])
   assert.deepEqual(events.map(event=>event.velocity),[38,53,23,38])
-  const expected=[0,25,50,125]
+  const expected=[0,15,30,75]
   events.forEach((event,index)=>assert.ok(Math.abs(event.onsetMs-expected[index])<1e-8))
   assert.equal(Math.min(...events.map(event=>event.onsetMs)),0)
   for(const event of events) {
@@ -70,14 +70,14 @@ test('performance keeps exact pitches and independently draws valid timing and v
   assert.throws(()=>concreteMidiNotes([128]), /Invalid/)
 })
 
-test('signed Gaussian timing has zero center and permits unclamped rare large offsets', async () => {
+test('Gaussian timing has zero center and normalization preserves relative differences', async () => {
   const { sampleTimingOffset, normalizeOnsets } = await import('../src/midi.ts')
   const sample = (radius, angle) => {
     const draws=[1-Math.exp(-radius*radius/2),angle]
     return sampleTimingOffset(()=>draws.shift())
   }
   assert.equal(sample(0,0),0)
-  for (const [radius,angle,expected] of [[1,0,25],[1,0.5,-25],[5,0,125],[5,0.5,-125]]) {
+  for (const [radius,angle,expected] of [[1,0,15],[1,0.5,-15],[5,0,75],[5,0.5,-75]]) {
     assert.ok(Math.abs(sample(radius,angle)-expected)<1e-6)
   }
   const offsets=[-70,15,90]

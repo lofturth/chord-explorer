@@ -1,3 +1,4 @@
+import { inversionBassClasses } from './pitchStructure.ts'
 export interface Constraints {
   voices: number
   low: number
@@ -5,6 +6,7 @@ export interface Constraints {
   distinct: number | null
   pitchClasses?: number[]
   structure?: Structure
+  inversion?: number | null
 }
 export type Structure = 'any' | 'major' | 'minor'
 export const structures = { any: 'Any', major: '0–4–7', minor: '0–3–7' } as const
@@ -20,11 +22,13 @@ function bitCount(mask: number): number {
   return count
 }
 // Increasing MIDI sequences represent each unordered voicing exactly once.
-export function enumerateChords({ voices, low, high, distinct, pitchClasses = [], structure = 'any' }: Constraints) {
+export function enumerateChords({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null }: Constraints) {
   const chords: number[][] = []
+  const inversionMasks = new Map<number, number>()
   let count = 0
   const selectedMask = pitchClasses.reduce((mask, pc) => mask | (1 << pc), 0)
   const selectedCount = bitCount(selectedMask)
+  if (inversion !== null && (!Number.isInteger(inversion) || inversion < 0 || inversion >= voices || (distinct !== null && inversion >= distinct) || (structure !== 'any' && inversion >= 3))) return { count, capped: false, chords }
   if (pitchClasses.some(pc => !Number.isInteger(pc) || pc < 0 || pc > 11) || selectedCount > voices || (distinct !== null && distinct < selectedCount)) return { count, capped: false, chords }
   const structureMasks = structure === 'any' ? [] : Array.from({ length: 12 }, (_, root) =>
     [0, structure === 'major' ? 4 : 3, 7].reduce((mask, interval) => mask | (1 << ((root + interval) % 12)), 0))
@@ -45,6 +49,15 @@ export function enumerateChords({ voices, low, high, distinct, pitchClasses = []
     // Only pursue partial voicings that can complete a supported transposition.
     if (structureMasks.length && !structureMasks.some(target => (mask & target) === mask && ((mask | (suffixMasks[start] ?? 0)) & target) === target)) return false
     if (remaining === 0) {
+      if (inversion !== null) {
+        let bassMask = inversionMasks.get(mask)
+        if (bassMask === undefined) {
+          const pcs = Array.from({length:12},(_,pc)=>pc).filter(pc=>mask & (1 << pc))
+          bassMask = inversionBassClasses(pcs, inversion).reduce((bits,pc)=>bits | (1 << pc),0)
+          inversionMasks.set(mask,bassMask)
+        }
+        if (!(bassMask & (1 << (chord[0] % 12)))) return false
+      }
       count++
       if (count <= EXAMPLE_LIMIT) chords.push([...chord])
       return count > COUNT_LIMIT

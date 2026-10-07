@@ -8,6 +8,7 @@ import { MidiTest } from './MidiTest'
 import { useMidi } from './useMidi'
 import { AUTOPLAY_INTERVALS, DEFAULT_AUTOPLAY_INTERVAL, createAutoplay } from './autoplay'
 import type { AutoplayInterval } from './autoplay'
+import { inversionLabel } from './pitchStructure'
 import { pitchClassDisabled, reconcilePitchSelection } from './pitchSelection'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
@@ -17,24 +18,28 @@ function App() {
   const [high, setHigh] = useState(84)
   const [distinct, setDistinct] = useState(0)
   const [pitchClasses, setPitchClasses] = useState<number[]>([])
+  const [inversion, setInversion] = useState<number | null>(null)
   const [structure, setStructure] = useState<Structure>('any')
   const derivedDistinct = structure !== 'any' ? Math.min(voices, Math.max(3, pitchClasses.length)) : 0
   const effectiveDistinct = derivedDistinct || distinct || null
+  const structuralSize = structure !== 'any' ? Math.min(voices, 3) : effectiveDistinct || voices
+  const activeInversion = inversion !== null && inversion >= structuralSize ? null : inversion
+  if (activeInversion !== inversion) setInversion(activeInversion)
   function updatePitchSelection(nextVoices: number, required: number[]) {
     const next = reconcilePitchSelection(nextVoices, required, distinct)
     setVoices(nextVoices)
     setPitchClasses(next.pitchClasses)
     setDistinct(next.distinct)
   }
-  const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
-  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
+  const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion])
+  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion])
   const [structuresOpen, setStructuresOpen] = useState(false)
   const [commonFirst, setCommonFirst] = useState(false)
   const orderedSummary = useMemo(() => orderSummaryRows(summary, commonFirst), [summary, commonFirst])
   const [selected, setSelected] = useState<string | null>(null)
   const activeSelection = availableSelection(selected, summary)
   if (selected !== activeSelection) setSelected(activeSelection)
-  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure }), [voices, low, high, effectiveDistinct, pitchClasses, structure])
+  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion])
   const examples = useMemo(() => sampleChords(constraints, 100), [constraints])
   const [autoplayEnabled, setAutoplayEnabled] = useState(false)
   const [autoplayInterval, setAutoplayInterval] = useState<AutoplayInterval>(DEFAULT_AUTOPLAY_INTERVAL)
@@ -115,9 +120,16 @@ function App() {
           </td></tr>
           <tr><th scope="row"><label htmlFor="chord-type">Chord type</label></th><td>
             <select id="chord-type" value={structure} onChange={e => setStructure(e.target.value as Structure)}>
-              <option value="any">Any</option><option value="major">Major</option><option value="minor">Minor</option>
+              <option value="any">Any</option><option value="major">Major triad</option><option value="minor">Minor triad</option>
             </select>
             <p><small>Another representation of the same interval-structure constraint.</small></p>
+          </td></tr>
+          <tr><th scope="row"><label htmlFor="inversion">Inversion</label></th><td>
+            <select id="inversion" value={activeInversion ?? 'any'} onChange={event => setInversion(event.target.value === 'any' ? null : Number(event.target.value))}>
+              <option value="any">Any</option>
+              {Array.from({ length: structuralSize }, (_, member) => <option key={member} value={member}>{inversionLabel(member)}</option>)}
+            </select>
+            <p><small>Member of the normalized interval structure in the bass. Symmetric structures may have equivalent references.</small></p>
           </td></tr>
           <tr><th scope="row">Pitch classes</th><td>
             <div className="pitch-classes" role="group" aria-label="Pitch classes">
