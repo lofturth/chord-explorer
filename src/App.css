@@ -95,3 +95,7 @@ select { border-radius: 6px; background: #ffffff; box-shadow: 0 1px 2px #25364d0
   .structure-count { margin-left: 0; }
   .structure-heading button > span:last-child { margin-left: auto; }
 }
+.midi-test { padding: 16px; border: 1px solid #e0e7f0; border-radius: 8px; background: white; margin-top: 24px; font-size: .85rem; }
+.midi-test button { font: inherit; padding: 6px 10px; border: 1px solid #b4c9e4; border-radius: 6px; background: #f8faff; color: #265da5; cursor: pointer; margin-right: 12px; }
+.midi-test button:disabled { opacity: .55; cursor: default; }
+.midi-test label { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 12px 8px 0; }

@@ -4,6 +4,7 @@ import type { Structure } from './chords'
 import { availableSelection, orderSummaryRows, summarizeStructures } from './summary'
 import { sampleChords } from './sampling'
 import './App.css'
+import { MidiTest } from './MidiTest'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
   const [voices, setVoices] = useState(4)
@@ -53,6 +54,7 @@ function App() {
       <div className="sticky-count" aria-live="polite">Remaining: {result.capped ? '>10,000' : result.count.toLocaleString('en-US')}</div>
       <h1>Chord-space explorer</h1>
       <p>Change constraints to narrow the space of possible chords.</p>
+      <MidiTest />
       <table className="constraints">
         <caption>Constraints</caption>
         <tbody>
