@@ -91,6 +91,6 @@ test('autoplay follows updated root and inversion through existing shared sampli
   constraints={...base,root:2,pitchClasses:[0]};tick()
   assert.equal(played.length,2)
   assert.deepEqual(played.map(chord=>structuralRoot(pcs(chord))),[2,0])
-  assert.deepEqual(played.map(voicingInversions),[[1],[2]])
+  assert.deepEqual(played.map(notes=>voicingInversions(notes)),[[1],[2]])
   autoplay.stop()
 })

@@ -89,6 +89,6 @@ test('autoplay uses updated inversion constraints through the shared sampler', (
   tick()
   constraints={...base,inversion:2}
   tick()
-  assert.deepEqual(played.map(voicingInversions),[[0],[2]])
+  assert.deepEqual(played.map(notes=>voicingInversions(notes)),[[0],[2]])
   autoplay.stop()
 })

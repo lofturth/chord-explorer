@@ -1,15 +1,21 @@
-import { structures } from './chords.ts'
+import { chordTypes, selectedIntervals } from './chordTypes.ts'
 import type { Constraints } from './chords.ts'
 
 export interface StructureSummary {
   intervals: number[]
-  type: 'Major triad' | 'Minor triad' | '—'
+  type: string
   pitchClassSets: number
   examples: number[][]
 }
 
 export { normalizePitchClasses } from './pitchStructure.ts'
-import { normalizePitchClasses, feasibleInversionBasses, structuralRoot } from './pitchStructure.ts'
+import { normalizePitchClasses, feasibleInversionBasses, structuralRoot, interpretationReferences } from './pitchStructure.ts'
+
+const conventionalLabels = new Map<string, string[]>()
+for (const type of Object.values(chordTypes)) {
+  const key = normalizePitchClasses(type.intervals).join('–')
+  conventionalLabels.set(key, [...(conventionalLabels.get(key) ?? []), type.label])
+}
 
 // A set is realizable iff each class has a pitch in the range, it has at most
 // `voices` classes, and its available distinct MIDI pitches can fill all voices.
@@ -27,11 +33,10 @@ export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClass
     if ((mask & selectedMask) !== selectedMask) continue
     const pcs = Array.from({ length: 12 }, (_, pc) => pc).filter(pc => mask & (1 << pc))
     if (pcs.length > voices || (distinct !== null && pcs.length !== distinct) || pcs.some(pc => capacity[pc] === 0) || pcs.reduce((sum, pc) => sum + capacity[pc], 0) < voices) continue
-    const intervals = normalizePitchClasses(pcs)
-    const key = intervals.join('–')
-    if (structure !== 'any' && key !== structures[structure]) continue
-    if (root !== null && structuralRoot(pcs) !== root) continue
-    if (inversion !== null && !feasibleInversionBasses(pcs, voices, low, high, inversion).length) continue
+    const intervals = selectedIntervals(structure)
+    if (intervals && !interpretationReferences(pcs, intervals).length) continue
+    if (root !== null && structuralRoot(pcs, intervals) !== root) continue
+    if (inversion !== null && !feasibleInversionBasses(pcs, voices, low, high, inversion, intervals).length) continue
     sets.push(pcs)
   }
   return sets
@@ -44,7 +49,7 @@ export function summarizeStructures(constraints: Constraints): StructureSummary[
     const key = intervals.join('–')
     let group = groups.get(key)
     if (!group) {
-      group = { intervals, type: key === structures.major ? 'Major triad' : key === structures.minor ? 'Minor triad' : '—', pitchClassSets: 0, examples: [] }
+      group = { intervals, type: conventionalLabels.get(key)?.join(' / ') ?? '—', pitchClassSets: 0, examples: [] }
       groups.set(key, group)
     }
     group.pitchClassSets++

@@ -1,3 +1,4 @@
+import { chordTypes, selectedIntervals } from './chordTypes'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { enumerateChords, names, noteName, structures } from './chords'
 import type { Structure } from './chords'
@@ -21,9 +22,10 @@ function App() {
   const [root, setRoot] = useState<number | null>(null)
   const [inversion, setInversion] = useState<number | null>(null)
   const [structure, setStructure] = useState<Structure>('any')
-  const derivedDistinct = structure !== 'any' ? Math.min(voices, Math.max(3, pitchClasses.length)) : 0
+  const typeSize = selectedIntervals(structure)?.length ?? 0
+  const derivedDistinct = structure !== 'any' ? Math.min(voices, Math.max(typeSize, pitchClasses.length)) : 0
   const effectiveDistinct = derivedDistinct || distinct || null
-  const structuralSize = structure !== 'any' ? Math.min(voices, 3) : effectiveDistinct || voices
+  const structuralSize = structure !== 'any' ? Math.min(voices, typeSize) : effectiveDistinct || voices
   const activeInversion = inversion !== null && inversion >= structuralSize ? null : inversion
   if (activeInversion !== inversion) setInversion(activeInversion)
   function updatePitchSelection(nextVoices: number, required: number[]) {
@@ -121,7 +123,7 @@ function App() {
           </td></tr>
           <tr><th scope="row"><label htmlFor="chord-type">Chord type</label></th><td>
             <select id="chord-type" value={structure} onChange={e => setStructure(e.target.value as Structure)}>
-              <option value="any">Any</option><option value="major">Major triad</option><option value="minor">Minor triad</option>
+              <option value="any">Any</option>{Object.entries(chordTypes).map(([value,type]) => <option key={value} value={value}>{type.label}</option>)}
             </select>
             <p><small>Another representation of the same interval-structure constraint.</small></p>
           </td></tr>
@@ -130,14 +132,14 @@ function App() {
               <option value="any">Any</option>
               {names.map((name, pc) => <option key={pc} value={pc}>{name}</option>)}
             </select>
-            <p><small>Fixes the unique normalized structural reference, independently of the bass. A fixed root excludes structures with ambiguous references.</small></p>
+            <p><small>Fixes the unique reference of the selected type, or the normalized structure when Any is selected, independently of the bass. A fixed root excludes structures with ambiguous references.</small></p>
           </td></tr>
           <tr><th scope="row"><label htmlFor="inversion">Inversion</label></th><td>
             <select id="inversion" value={activeInversion ?? 'any'} onChange={event => setInversion(event.target.value === 'any' ? null : Number(event.target.value))}>
               <option value="any">Any</option>
               {Array.from({ length: structuralSize }, (_, member) => <option key={member} value={member}>{inversionLabel(member)}</option>)}
             </select>
-            <p><small>Member of the normalized interval structure in the bass. Symmetric structures may have equivalent references.</small></p>
+            <p><small>Member of the selected type’s interval structure in the bass; with Any, uses the normalized structure. Symmetric structures may have equivalent references.</small></p>
           </td></tr>
           <tr><th scope="row">Pitch classes</th><td>
             <div className="pitch-classes" role="group" aria-label="Pitch classes">
@@ -155,7 +157,7 @@ function App() {
               <option value={0}>Any</option>
               {Array.from({ length: voices }, (_, i) => i + 1).map(n => <option key={n} disabled={n < pitchClasses.length}>{n}</option>)}
             </select>
-            {derivedDistinct > 0 && <p id="derived-distinct"><small>The interval structure requires 3 distinct pitch classes. Incompatible voice counts or required pitch classes give zero possibilities.</small></p>}
+            {derivedDistinct > 0 && <p id="derived-distinct"><small>The interval structure requires {typeSize} distinct pitch classes. Incompatible voice counts or required pitch classes give zero possibilities.</small></p>}
           </td></tr>
         </tbody>
       </table>

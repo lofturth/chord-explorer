@@ -12,34 +12,44 @@ export function structureReferences(pcs: readonly number[]) {
   return rotations.filter(rotation => rotation.intervals.join(',') === key)
 }
 
+// Root and Inversion share this policy: selected type's ordered intervals,
+// otherwise the existing mathematical reference. Multiple matches stay ambiguous.
+export function interpretationReferences(pcs: readonly number[], intervals?: readonly number[]) {
+  if (!intervals) return structureReferences(pcs)
+  const unique = [...new Set(pcs)]
+  if (unique.length !== intervals.length) return []
+  return unique.filter(reference => intervals.every(interval => unique.includes((reference+interval)%12)))
+    .map(reference => ({ reference, intervals: [...intervals] }))
+}
+
 export function normalizePitchClasses(pcs: readonly number[]): number[] {
   return structureReferences(pcs)[0]?.intervals ?? []
 }
 
-// Only unique normalized references support fixed Root filtering. Symmetric sets
+// Only unique interpreted references support fixed Root filtering. Symmetric sets
 // remain available with Root=Any; no arbitrary conventional root is assigned.
-export function structuralRoot(pcs: readonly number[]): number | null {
-  const references = structureReferences(pcs)
+export function structuralRoot(pcs: readonly number[], intervals?: readonly number[]): number | null {
+  const references = interpretationReferences(pcs, intervals)
   return references.length === 1 ? references[0].reference : null
 }
 
-export function inversionBassClasses(pcs: readonly number[], inversion: number): number[] {
+export function inversionBassClasses(pcs: readonly number[], inversion: number, intervals?: readonly number[]): number[] {
   if (!Number.isInteger(inversion) || inversion < 0) return []
-  return [...new Set(structureReferences(pcs).flatMap(({reference, intervals}) =>
+  return [...new Set(interpretationReferences(pcs, intervals).flatMap(({reference, intervals}) =>
     inversion < intervals.length ? [(reference + intervals[inversion]) % 12] : []))]
 }
 
-export function voicingInversions(notes: readonly number[]): number[] {
+export function voicingInversions(notes: readonly number[], intervals?: readonly number[]): number[] {
   if (!notes.length) return []
   const bass = Math.min(...notes) % 12
   const pcs = [...new Set(notes.map(note => note % 12))]
-  return [...new Set(structureReferences(pcs).map(({reference, intervals}) => intervals.indexOf((bass-reference+12)%12)))]
+  return [...new Set(interpretationReferences(pcs, intervals).map(({reference, intervals}) => intervals.indexOf((bass-reference+12)%12)))]
 }
 
 // A bass is possible iff every other class occurs above it and enough distinct
 // MIDI pitches remain to fill the voices. No enumeration of concrete chords.
-export function feasibleInversionBasses(pcs: readonly number[], voices: number, low: number, high: number, inversion: number): number[] {
-  const classes = inversionBassClasses(pcs, inversion)
+export function feasibleInversionBasses(pcs: readonly number[], voices: number, low: number, high: number, inversion: number, intervals?: readonly number[]): number[] {
+  const classes = inversionBassClasses(pcs, inversion, intervals)
   const result: number[] = []
   for (let bass = low; bass <= high; bass++) {
     if (!classes.includes(bass % 12)) continue

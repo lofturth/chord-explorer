@@ -1,3 +1,4 @@
+import { selectedIntervals } from './chordTypes.ts'
 import { feasibleInversionBasses } from './pitchStructure.ts'
 import type { Constraints } from './chords.ts'
 import { feasiblePitchClassSets, normalizePitchClasses } from './summary.ts'
@@ -16,7 +17,7 @@ function shuffled<T>(values: T[], random: () => number): T[] {
 export function sampleChords(constraints: Constraints, limit: number, selected: string | null = null, random: () => number = Math.random): number[][] {
   const sets = feasiblePitchClassSets(constraints).filter(pcs => selected === null || normalizePitchClasses(pcs).join('–') === selected)
   if (!sets.length || limit <= 0) return []
-  const pools = sets.map(pcs => ({ basses: constraints.inversion == null ? [] : feasibleInversionBasses(pcs, constraints.voices, constraints.low, constraints.high, constraints.inversion), pool: pcs.map(pc => {
+  const pools = sets.map(pcs => ({ basses: constraints.inversion == null ? [] : feasibleInversionBasses(pcs, constraints.voices, constraints.low, constraints.high, constraints.inversion, selectedIntervals(constraints.structure ?? 'any')), pool: pcs.map(pc => {
     const notes: number[] = []
     for (let n = constraints.low; n <= constraints.high; n++) if (n % 12 === pc) notes.push(n)
     return notes
