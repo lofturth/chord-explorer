@@ -18,6 +18,7 @@ function App() {
   const [high, setHigh] = useState(84)
   const [distinct, setDistinct] = useState(0)
   const [pitchClasses, setPitchClasses] = useState<number[]>([])
+  const [root, setRoot] = useState<number | null>(null)
   const [inversion, setInversion] = useState<number | null>(null)
   const [structure, setStructure] = useState<Structure>('any')
   const derivedDistinct = structure !== 'any' ? Math.min(voices, Math.max(3, pitchClasses.length)) : 0
@@ -31,15 +32,15 @@ function App() {
     setPitchClasses(next.pitchClasses)
     setDistinct(next.distinct)
   }
-  const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion])
-  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion])
+  const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root])
+  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root])
   const [structuresOpen, setStructuresOpen] = useState(false)
   const [commonFirst, setCommonFirst] = useState(false)
   const orderedSummary = useMemo(() => orderSummaryRows(summary, commonFirst), [summary, commonFirst])
   const [selected, setSelected] = useState<string | null>(null)
   const activeSelection = availableSelection(selected, summary)
   if (selected !== activeSelection) setSelected(activeSelection)
-  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion])
+  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root])
   const examples = useMemo(() => sampleChords(constraints, 100), [constraints])
   const [autoplayEnabled, setAutoplayEnabled] = useState(false)
   const [autoplayInterval, setAutoplayInterval] = useState<AutoplayInterval>(DEFAULT_AUTOPLAY_INTERVAL)
@@ -123,6 +124,13 @@ function App() {
               <option value="any">Any</option><option value="major">Major triad</option><option value="minor">Minor triad</option>
             </select>
             <p><small>Another representation of the same interval-structure constraint.</small></p>
+          </td></tr>
+          <tr><th scope="row"><label htmlFor="root">Root</label></th><td>
+            <select id="root" value={root ?? 'any'} onChange={event => setRoot(event.target.value === 'any' ? null : Number(event.target.value))}>
+              <option value="any">Any</option>
+              {names.map((name, pc) => <option key={pc} value={pc}>{name}</option>)}
+            </select>
+            <p><small>Fixes the unique normalized structural reference, independently of the bass. A fixed root excludes structures with ambiguous references.</small></p>
           </td></tr>
           <tr><th scope="row"><label htmlFor="inversion">Inversion</label></th><td>
             <select id="inversion" value={activeInversion ?? 'any'} onChange={event => setInversion(event.target.value === 'any' ? null : Number(event.target.value))}>

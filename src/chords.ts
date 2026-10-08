@@ -1,4 +1,4 @@
-import { inversionBassClasses } from './pitchStructure.ts'
+import { inversionBassClasses, structuralRoot } from './pitchStructure.ts'
 export interface Constraints {
   voices: number
   low: number
@@ -7,6 +7,7 @@ export interface Constraints {
   pitchClasses?: number[]
   structure?: Structure
   inversion?: number | null
+  root?: number | null
 }
 export type Structure = 'any' | 'major' | 'minor'
 export const structures = { any: 'Any', major: '0–4–7', minor: '0–3–7' } as const
@@ -22,16 +23,19 @@ function bitCount(mask: number): number {
   return count
 }
 // Increasing MIDI sequences represent each unordered voicing exactly once.
-export function enumerateChords({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null }: Constraints) {
+export function enumerateChords({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null, root = null }: Constraints) {
   const chords: number[][] = []
   const inversionMasks = new Map<number, number>()
+  const rootMatches = new Map<number, boolean>()
   let count = 0
+  if (root !== null && (!Number.isInteger(root) || root < 0 || root > 11)) return { count, capped: false, chords }
   const selectedMask = pitchClasses.reduce((mask, pc) => mask | (1 << pc), 0)
   const selectedCount = bitCount(selectedMask)
   if (inversion !== null && (!Number.isInteger(inversion) || inversion < 0 || inversion >= voices || (distinct !== null && inversion >= distinct) || (structure !== 'any' && inversion >= 3))) return { count, capped: false, chords }
   if (pitchClasses.some(pc => !Number.isInteger(pc) || pc < 0 || pc > 11) || selectedCount > voices || (distinct !== null && distinct < selectedCount)) return { count, capped: false, chords }
-  const structureMasks = structure === 'any' ? [] : Array.from({ length: 12 }, (_, root) =>
-    [0, structure === 'major' ? 4 : 3, 7].reduce((mask, interval) => mask | (1 << ((root + interval) % 12)), 0))
+  const references = root === null ? Array.from({ length: 12 }, (_, pc) => pc) : [root]
+  const structureMasks = structure === 'any' ? [] : references.map(reference =>
+    [0, structure === 'major' ? 4 : 3, 7].reduce((mask, interval) => mask | (1 << ((reference + interval) % 12)), 0))
   if (structure !== 'any' && ((distinct !== null && distinct !== 3) || !structureMasks.some(mask => (mask & selectedMask) === selectedMask))) return { count, capped: false, chords }
   const targetDistinct = structure !== 'any' ? 3 : distinct
   if (![voices, low, high].every(Number.isInteger) || voices < 1 || voices > 8 || low < 0 || high > 127 || low > high || (distinct !== null && (!Number.isInteger(distinct) || distinct < 1 || distinct > Math.min(12, voices)))) {
@@ -48,7 +52,17 @@ export function enumerateChords({ voices, low, high, distinct, pitchClasses = []
     if (bitCount(selectedMask & ~mask) > remaining) return false
     // Only pursue partial voicings that can complete a supported transposition.
     if (structureMasks.length && !structureMasks.some(target => (mask & target) === mask && ((mask | (suffixMasks[start] ?? 0)) & target) === target)) return false
+    if (root !== null && !((mask | (suffixMasks[start] ?? 0)) & (1 << root))) return false
     if (remaining === 0) {
+      if (root !== null) {
+        let matches = rootMatches.get(mask)
+        if (matches === undefined) {
+          const pcs = Array.from({length:12},(_,pc)=>pc).filter(pc=>mask & (1 << pc))
+          matches = structuralRoot(pcs) === root
+          rootMatches.set(mask,matches)
+        }
+        if (!matches) return false
+      }
       if (inversion !== null) {
         let bassMask = inversionMasks.get(mask)
         if (bassMask === undefined) {

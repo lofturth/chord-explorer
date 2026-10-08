@@ -9,14 +9,15 @@ export interface StructureSummary {
 }
 
 export { normalizePitchClasses } from './pitchStructure.ts'
-import { normalizePitchClasses, feasibleInversionBasses } from './pitchStructure.ts'
+import { normalizePitchClasses, feasibleInversionBasses, structuralRoot } from './pitchStructure.ts'
 
 // A set is realizable iff each class has a pitch in the range, it has at most
 // `voices` classes, and its available distinct MIDI pitches can fill all voices.
 // No concrete voicing enumeration is needed to prove this for current constraints.
-export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null }: Constraints): number[][] {
+export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null, root = null }: Constraints): number[][] {
   if (![voices, low, high].every(Number.isInteger) || voices < 1 || voices > 8 || low < 0 || high > 127 || low > high ||
     (distinct !== null && (!Number.isInteger(distinct) || distinct < 1 || distinct > 12)) ||
+    (root !== null && (!Number.isInteger(root) || root < 0 || root > 11)) ||
     pitchClasses.some(pc => !Number.isInteger(pc) || pc < 0 || pc > 11)) return []
   const capacity = Array<number>(12).fill(0)
   for (let pitch = low; pitch <= high; pitch++) capacity[pitch % 12]++
@@ -29,6 +30,7 @@ export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClass
     const intervals = normalizePitchClasses(pcs)
     const key = intervals.join('–')
     if (structure !== 'any' && key !== structures[structure]) continue
+    if (root !== null && structuralRoot(pcs) !== root) continue
     if (inversion !== null && !feasibleInversionBasses(pcs, voices, low, high, inversion).length) continue
     sets.push(pcs)
   }

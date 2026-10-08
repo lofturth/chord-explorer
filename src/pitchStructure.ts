@@ -16,6 +16,13 @@ export function normalizePitchClasses(pcs: readonly number[]): number[] {
   return structureReferences(pcs)[0]?.intervals ?? []
 }
 
+// Only unique normalized references support fixed Root filtering. Symmetric sets
+// remain available with Root=Any; no arbitrary conventional root is assigned.
+export function structuralRoot(pcs: readonly number[]): number | null {
+  const references = structureReferences(pcs)
+  return references.length === 1 ? references[0].reference : null
+}
+
 export function inversionBassClasses(pcs: readonly number[], inversion: number): number[] {
   if (!Number.isInteger(inversion) || inversion < 0) return []
   return [...new Set(structureReferences(pcs).flatMap(({reference, intervals}) =>
