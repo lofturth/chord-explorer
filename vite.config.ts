@@ -16,7 +16,9 @@ function getGitCommit() {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Keep watching for cache invalidation, but never push updates to play tabs.
+  server: mode === 'play' ? { hmr: false, ws: false } : undefined,
   plugins: [
     react(),
     ...(process.env.CLOUDFLARE_ENV ? [cloudflare()] : []),
@@ -26,4 +28,4 @@ export default defineConfig({
     __GIT_COMMIT__: JSON.stringify(getGitCommit()),
     __DEPLOY_ENV__: JSON.stringify(process.env.DEPLOY_ENV || 'LOCAL'),
   },
-})
+}))

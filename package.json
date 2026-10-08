@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "play": "npm run build -- --outDir .play-dist && vite preview --outDir .play-dist --host 127.0.0.1 --port 4173 --strictPort",
+    "play": "vite --mode play --host 127.0.0.1 --port 4173 --strictPort",
     "build": "tsc -b && vite build",
     "build:staging": "tsc -b && CLOUDFLARE_ENV=staging DEPLOY_ENV=STAGING vite build",
     "build:prod": "tsc -b && CLOUDFLARE_ENV=production DEPLOY_ENV=PRODUCTION vite build",
