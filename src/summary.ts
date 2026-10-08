@@ -1,3 +1,4 @@
+import { scaleMask } from './scales.ts'
 import { chordTypes, selectedIntervals } from './chordTypes.ts'
 import type { Constraints } from './chords.ts'
 
@@ -20,16 +21,18 @@ for (const type of Object.values(chordTypes)) {
 // A set is realizable iff each class has a pitch in the range, it has at most
 // `voices` classes, and its available distinct MIDI pitches can fill all voices.
 // No concrete voicing enumeration is needed to prove this for current constraints.
-export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null, root = null }: Constraints): number[][] {
+export function feasiblePitchClassSets({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null, root = null, scale = null }: Constraints): number[][] {
   if (![voices, low, high].every(Number.isInteger) || voices < 1 || voices > 8 || low < 0 || high > 127 || low > high ||
     (distinct !== null && (!Number.isInteger(distinct) || distinct < 1 || distinct > 12)) ||
     (root !== null && (!Number.isInteger(root) || root < 0 || root > 11)) ||
     pitchClasses.some(pc => !Number.isInteger(pc) || pc < 0 || pc > 11)) return []
+  const allowedMask = scaleMask(scale)
   const capacity = Array<number>(12).fill(0)
   for (let pitch = low; pitch <= high; pitch++) capacity[pitch % 12]++
   const selectedMask = pitchClasses.reduce((mask, pc) => mask | (1 << pc), 0)
   const sets: number[][] = []
   for (let mask = 1; mask < 4096; mask++) {
+    if ((mask & allowedMask) !== mask) continue
     if ((mask & selectedMask) !== selectedMask) continue
     const pcs = Array.from({ length: 12 }, (_, pc) => pc).filter(pc => mask & (1 << pc))
     if (pcs.length > voices || (distinct !== null && pcs.length !== distinct) || pcs.some(pc => capacity[pc] === 0) || pcs.reduce((sum, pc) => sum + capacity[pc], 0) < voices) continue

@@ -1,3 +1,5 @@
+import { scaleMask } from './scales.ts'
+import type { ScaleConstraint } from './scales.ts'
 import { selectedIntervals } from './chordTypes.ts'
 import type { Structure } from './chordTypes.ts'
 export { structures } from './chordTypes.ts'
@@ -12,6 +14,7 @@ export interface Constraints {
   structure?: Structure
   inversion?: number | null
   root?: number | null
+  scale?: ScaleConstraint | null
 }
 export const COUNT_LIMIT = 10_000
 export const EXAMPLE_LIMIT = 100
@@ -25,7 +28,8 @@ function bitCount(mask: number): number {
   return count
 }
 // Increasing MIDI sequences represent each unordered voicing exactly once.
-export function enumerateChords({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null, root = null }: Constraints) {
+export function enumerateChords({ voices, low, high, distinct, pitchClasses = [], structure = 'any', inversion = null, root = null, scale = null }: Constraints) {
+  const allowedMask = scaleMask(scale)
   const intervals = selectedIntervals(structure)
   const size = intervals?.length
   const chords: number[][] = []
@@ -37,18 +41,19 @@ export function enumerateChords({ voices, low, high, distinct, pitchClasses = []
   if (root !== null && intervals && structuralRoot(intervals.map(interval => (root + interval) % 12), intervals) !== root) return { count, capped: false, chords }
   const selectedMask = pitchClasses.reduce((mask, pc) => mask | (1 << pc), 0)
   const selectedCount = bitCount(selectedMask)
+  if (!allowedMask || (selectedMask & allowedMask) !== selectedMask || (root !== null && !(allowedMask & (1 << root)))) return { count, capped: false, chords }
   if (inversion !== null && (!Number.isInteger(inversion) || inversion < 0 || inversion >= voices || (distinct !== null && inversion >= distinct) || (size !== undefined && inversion >= size))) return { count, capped: false, chords }
   if (pitchClasses.some(pc => !Number.isInteger(pc) || pc < 0 || pc > 11) || selectedCount > voices || (distinct !== null && distinct < selectedCount)) return { count, capped: false, chords }
   const references = root === null ? Array.from({ length: 12 }, (_, pc) => pc) : [root]
   const structureMasks = structure === 'any' ? [] : references.map(reference =>
-    intervals!.reduce((mask, interval) => mask | (1 << ((reference + interval) % 12)), 0))
+    intervals!.reduce((mask, interval) => mask | (1 << ((reference + interval) % 12)), 0)).filter(mask => (mask & allowedMask) === mask)
   if (structure !== 'any' && ((distinct !== null && distinct !== size) || !structureMasks.some(mask => (mask & selectedMask) === selectedMask))) return { count, capped: false, chords }
   const targetDistinct = size ?? distinct
   if (![voices, low, high].every(Number.isInteger) || voices < 1 || voices > 8 || low < 0 || high > 127 || low > high || (distinct !== null && (!Number.isInteger(distinct) || distinct < 1 || distinct > Math.min(12, voices)))) {
     return { count, capped: false, chords }
   }
   const suffixMasks = new Array<number>(high + 2).fill(0)
-  for (let pitch = high; pitch >= low; pitch--) suffixMasks[pitch] = suffixMasks[pitch + 1] | (1 << (pitch % 12))
+  for (let pitch = high; pitch >= low; pitch--) suffixMasks[pitch] = suffixMasks[pitch + 1] | (allowedMask & (1 << (pitch % 12)))
   const chord: number[] = []
   function visit(start: number, mask: number): boolean {
     const remaining = voices - chord.length
@@ -83,6 +88,7 @@ export function enumerateChords({ voices, low, high, distinct, pitchClasses = []
       return count > COUNT_LIMIT
     }
     for (let pitch = start; pitch <= high - remaining + 1; pitch++) {
+      if (!(allowedMask & (1 << (pitch % 12)))) continue
       const nextMask = mask | (1 << (pitch % 12))
       if (targetDistinct !== null && bitCount(nextMask) > targetDistinct) continue
       chord.push(pitch)

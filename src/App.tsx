@@ -1,3 +1,5 @@
+import { scalePitchClasses } from './scales'
+import type { ScaleMode } from './scales'
 import { chordTypes, selectedIntervals } from './chordTypes'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { enumerateChords, names, noteName, structures } from './chords'
@@ -19,6 +21,11 @@ function App() {
   const [high, setHigh] = useState(84)
   const [distinct, setDistinct] = useState(0)
   const [pitchClasses, setPitchClasses] = useState<number[]>([])
+  const [tonic, setTonic] = useState(0)
+  const [scaleMode, setScaleMode] = useState<ScaleMode>('major')
+  const [restrictScale, setRestrictScale] = useState(false)
+  const scaleNotes = scalePitchClasses({ tonic, mode: scaleMode })
+  const activeScale = useMemo(() => restrictScale ? { tonic, mode: scaleMode } : null, [tonic, scaleMode, restrictScale])
   const [root, setRoot] = useState<number | null>(null)
   const [inversion, setInversion] = useState<number | null>(null)
   const [structure, setStructure] = useState<Structure>('any')
@@ -34,15 +41,15 @@ function App() {
     setPitchClasses(next.pitchClasses)
     setDistinct(next.distinct)
   }
-  const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root])
-  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root])
+  const result = useMemo(() => enumerateChords({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root, scale: activeScale }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root, activeScale])
+  const summary = useMemo(() => summarizeStructures({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root, scale: activeScale }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root, activeScale])
   const [structuresOpen, setStructuresOpen] = useState(false)
   const [commonFirst, setCommonFirst] = useState(false)
   const orderedSummary = useMemo(() => orderSummaryRows(summary, commonFirst), [summary, commonFirst])
   const [selected, setSelected] = useState<string | null>(null)
   const activeSelection = availableSelection(selected, summary)
   if (selected !== activeSelection) setSelected(activeSelection)
-  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root])
+  const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root, scale: activeScale }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root, activeScale])
   const examples = useMemo(() => sampleChords(constraints, 100), [constraints])
   const [autoplayEnabled, setAutoplayEnabled] = useState(false)
   const [autoplayInterval, setAutoplayInterval] = useState<AutoplayInterval>(DEFAULT_AUTOPLAY_INTERVAL)
@@ -126,6 +133,14 @@ function App() {
               <option value="any">Any</option>{Object.entries(chordTypes).map(([value,type]) => <option key={value} value={value}>{type.label}</option>)}
             </select>
             <p><small>Another representation of the same interval-structure constraint.</small></p>
+          </td></tr>
+          <tr><th scope="row">Key &amp; Scale</th><td>
+            <div className="key-scale-controls">
+              <label>Tonic <select value={tonic} onChange={event => setTonic(Number(event.target.value))}>{names.map((name,pc) => <option key={pc} value={pc}>{name}</option>)}</select></label>
+              <label>Scale <select value={scaleMode} onChange={event => setScaleMode(event.target.value as ScaleMode)}><option value="major">Major</option><option value="naturalMinor">Natural minor</option></select></label>
+            </div>
+            <p className="scale-notes">{scaleNotes.map(pc => names[pc]).join(' – ')}</p>
+            <label className="scale-restriction"><input type="checkbox" checked={restrictScale} onChange={event => setRestrictScale(event.target.checked)} /> Only chords using notes from this scale</label>
           </td></tr>
           <tr><th scope="row"><label htmlFor="root">Root</label></th><td>
             <select id="root" value={root ?? 'any'} onChange={event => setRoot(event.target.value === 'any' ? null : Number(event.target.value))}>

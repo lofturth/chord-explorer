@@ -114,3 +114,9 @@ select { border-radius: 6px; background: #ffffff; box-shadow: 0 1px 2px #25364d0
 .autoplay-control kbd { font: inherit; margin-left: 6px; color: #64748b; border-left: 1px solid #cad6e6; padding-left: 6px; }
 .autoplay-control label { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 500; }
 .autoplay-control select { font: inherit; min-height: 32px; padding: 4px 8px; }
+
+.key-scale-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.key-scale-controls label { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; }
+.scale-notes { font-size: .85rem; color: #506886; }
+.scale-restriction { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; }
+.scale-restriction input { accent-color: #326ac0; }
