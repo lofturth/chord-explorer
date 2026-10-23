@@ -1,13 +1,14 @@
 import { scalePitchClasses } from './scales'
 import type { ScaleMode } from './scales'
 import { chordTypes, selectedIntervals } from './chordTypes'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { enumerateChords, names, noteName, structures } from './chords'
 import type { Structure } from './chords'
 import { availableSelection, orderSummaryRows, summarizeStructures } from './summary'
 import { sampleChords } from './sampling'
 import './App.css'
 import { MidiTest } from './MidiTest'
+import { FiveVoiceDiagnostics } from './FiveVoiceDiagnostics'
 import { useMidi } from './useMidi'
 import { AUTOPLAY_INTERVALS, DEFAULT_AUTOPLAY_INTERVAL, createAutoplay } from './autoplay'
 import type { AutoplayInterval } from './autoplay'
@@ -16,6 +17,13 @@ import { pitchClassDisabled, reconcilePitchSelection } from './pitchSelection'
 const pitches = Array.from({ length: 128 }, (_, midi) => midi)
 function App() {
   const midi = useMidi()
+  const [phoneConnected, setPhoneConnected] = useState(false)
+  const [phoneEnabled, setPhoneEnabled] = useState(false)
+  const [maxVelocity, setMaxVelocity] = useState(127)
+  const onPhoneConnection = useCallback((connected: boolean) => {
+    setPhoneConnected(connected)
+    if (!connected) setPhoneEnabled(false)
+  }, [])
   const [voices, setVoices] = useState(4)
   const [low, setLow] = useState(48)
   const [high, setHigh] = useState(84)
@@ -51,6 +59,15 @@ function App() {
   if (selected !== activeSelection) setSelected(activeSelection)
   const constraints = useMemo(() => ({ voices, low, high, distinct: effectiveDistinct, pitchClasses, structure, inversion: activeInversion, root, scale: activeScale }), [voices, low, high, effectiveDistinct, pitchClasses, structure, activeInversion, root, activeScale])
   const examples = useMemo(() => sampleChords(constraints, 100), [constraints])
+  const [chordSelection, setChordSelection] = useState<{
+    examples: typeof examples
+    chord: readonly number[]
+  } | null>(null)
+  const touchChord = chordSelection?.examples === examples ? chordSelection.chord : examples[0] ?? null
+  function auditionChord(chord: readonly number[]) {
+    if (phoneEnabled && phoneConnected) setChordSelection({ examples, chord })
+    void midi.play(chord)
+  }
   const [autoplayEnabled, setAutoplayEnabled] = useState(false)
   const [autoplayInterval, setAutoplayInterval] = useState<AutoplayInterval>(DEFAULT_AUTOPLAY_INTERVAL)
   const autoplayLoop = useRef<ReturnType<typeof createAutoplay> | null>(null)
@@ -114,6 +131,14 @@ function App() {
       <h1>Chord-space explorer</h1>
       <p>Change constraints to narrow the space of possible chords.</p>
       <MidiTest midi={midi} />
+      {phoneConnected && <div className="phone-controls"><label><input type="checkbox" checked={phoneEnabled} onChange={event => {
+        const enabled = event.target.checked
+        setPhoneEnabled(enabled)
+        if (enabled) updatePitchSelection(5, pitchClasses)
+      }} /> Play on iPhone</label>
+        <label>Maximum velocity <input type="range" min={1} max={127} step={1} value={maxVelocity} onChange={event => setMaxVelocity(Number(event.target.value))} /> <output>{maxVelocity}</output></label>
+      </div>}
+      <FiveVoiceDiagnostics output={midi.outputs.find(port => port.id === midi.selected)} chord={phoneEnabled && phoneConnected ? touchChord : null} onConnectionChange={onPhoneConnection} enabled={phoneEnabled && phoneConnected} maxVelocity={maxVelocity} />
       <table className="constraints">
         <caption>Constraints</caption>
         <tbody>
@@ -198,19 +223,19 @@ function App() {
             {activeSelection && <section ref={inspectionSection} tabIndex={-1} className="inspection-section" aria-label="Inspected chord examples">
               <h2>{inspected.length < 20 ? `All ${inspected.length} chords from ${activeSelection}` : `20 chord examples from ${activeSelection}`}</h2>
               <button type="button" onClick={() => { setStructuresOpen(true); requestAnimationFrame(() => navigateTo(selectedRow.current)) }}>Back to structure ↑</button>
-              <ul className="chords">{inspected.map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => midi.play(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>
+              <ul className="chords">{inspected.map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => auditionChord(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>
             </section>}
             <section ref={examplesSection} aria-label="Concrete chord examples">
             <h2>Concrete chord examples</h2>
             <p>{result.count <= 100 ? `Showing all ${result.count} chords` : `Showing ${examples.length} examples`}</p>
-            <ul className="chords">{examples.map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => midi.play(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>
+            <ul className="chords">{examples.map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => auditionChord(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>
             </section>
           </>}
       </section>
       <footer>{__DEPLOY_ENV__} · {__GIT_COMMIT__} · v{__APP_VERSION__}</footer>
       <aside className={`bottom-preview${mainExamplesVisible ? ' preview-hidden' : ''}`} aria-label="Chord preview" aria-hidden={mainExamplesVisible}>
         <div className="preview-heading"><span>{previewLabel}</span>{activeSelection && <button type="button" onClick={() => navigateTo(inspectionSection.current)}>View {inspected.length} ↓</button>}</div>
-        {previewChords.length === 0 ? <p>No matching chords.</p> : <ul>{previewChords.slice(0, 5).map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => midi.play(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>}
+        {previewChords.length === 0 ? <p>No matching chords.</p> : <ul>{previewChords.slice(0, 5).map(chord => <li key={chord.join(',')}><button type="button" className="play-chord" onClick={() => auditionChord(chord)} title="Play this voicing through MIDI">{chord.map(noteName).join(' – ')}</button></li>)}</ul>}
       </aside>
     </main>
   )
